@@ -218,7 +218,7 @@ void loop() {
     return;
   }
 
-  int32_t samples_read = resBytesIn / 8; // TODO: why 8?
+  int32_t samples_read = resBytesIn / 2; // TODO: why 8?
   static int32_t wBuffer[bufferLen];
   if (samples_read > 0) {
     for (int32_t i = 0; i < samples_read; ++i) {
