@@ -6,7 +6,7 @@
 #define GPIO3 15
 #define GPIO4 4
 
-// GPIO9 through GPIO18 is relevant
+// // GPIO9 through GPIO18 is relevant
 // #define GPIO9 17
 // #define GPIO10 18
 // #define GPIO11 19
@@ -40,14 +40,9 @@ uint8_t constBuffer[bufferSize];
 void setup() {
   // construct constBuffer
   for (size_t i = 0; i < bufferSize; i++) {
-    if (i < bufferSize / 2) {
-      constBuffer[i] = 0xff;
-    } else {
-      constBuffer[i] = 0x00;
-    }
+    constBuffer[i] = (i < bufferSize / 2) ? 0xff : 0x00;
   }
 
-  // put your setup code here, to run once:
   Serial.begin(115200);
   Serial.println("hello from esp32");
 
@@ -66,7 +61,7 @@ void setup() {
 
 
   // Use SPI to configure the codec
-  vspi = new SPIClass(SPI); // "VSPI" gave error
+  vspi = new SPIClass(3); // "VSPI" gave error
   vspi->begin(
     CODEC_MC, // CLK
     GPIO3, // Unused CIPO
@@ -200,14 +195,14 @@ void loop() {
   static uint8_t wBuffer[bufferSize];
   size_t sum = 0;
   if (resBytesIn > 0) {
-    for (size_t i = 0; i < bufferSize; ++i) {
+    for (size_t i = 0; i < resBytesIn; ++i) {
       wBuffer[i] = rBuffer[i];
       sum += rBuffer[i];
     }
   }
 
   size_t resBytesOut = 0;
-  res = i2s_channel_write(tx_handle, &wBuffer, bufferSize, &resBytesOut, portMAX_DELAY);
+  res = i2s_channel_write(tx_handle, &wBuffer, resBytesIn, &resBytesOut, portMAX_DELAY);
 
   if (res != ESP_OK) {
     Serial.println("Error writing to I2S");
