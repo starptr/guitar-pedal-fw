@@ -6,17 +6,19 @@
 #define GPIO3 15
 #define GPIO4 4
 
-// // GPIO9 through GPIO18 is relevant
-// #define GPIO9 17
-// #define GPIO10 18
-// #define GPIO11 19
-// #define GPIO12 20
-// #define GPIO13 21
-// #define GPIO14 22
-// #define GPIO15 8
-// #define GPIO16 9
-// #define GPIO17 10
-// #define GPIO18 11
+// GPIO9 through GPIO18 is relevant
+#define GPIO9 17
+#define GPIO10 18
+#define GPIO11 19
+#define GPIO12 20
+#define GPIO13 21
+#define GPIO14 22
+#define GPIO15 8
+#define GPIO16 9
+#define GPIO17 10
+#define GPIO18 11
+
+#define GPIO0 27
 
 #define CODEC_DATA_OUT GPIO_NUM_9
 #define CODEC_BITCLK GPIO_NUM_10
@@ -34,13 +36,20 @@ SPIClass* vspi = nullptr;
 i2s_chan_handle_t tx_handle;
 i2s_chan_handle_t rx_handle;
 
-static const size_t bufferSize = 80;
-uint8_t constBuffer[bufferSize];
+static const size_t bufferSize = 544;
+uint8_t constBuffer1[bufferSize];
+uint8_t constBuffer2[bufferSize];
+uint32_t counter = 0;
 
 void setup() {
   // construct constBuffer
   for (size_t i = 0; i < bufferSize; i++) {
-    constBuffer[i] = (i < bufferSize / 2) ? 0xff : 0x00;
+    // if it's unsigned, this is uint8::max() to uint8::min()
+    // if it's signed, this is (int8)-1 to (int8)0
+    constBuffer1[i] = (i < bufferSize / 2) ? 0xff : 0x00;
+    // if it's unsigned, this is (uint8)127 to (uint8)128
+    // if it's signed, this is int8::max() to int8::min()
+    constBuffer2[i] = (i < bufferSize / 2) ? 0x7f : 0x80;
   }
 
   Serial.begin(115200);
@@ -58,6 +67,9 @@ void setup() {
   pinMode(CODEC_MD, OUTPUT);
   pinMode(CODEC_ZFLG, INPUT);
   pinMode(CODEC_DATA_IN, OUTPUT);
+
+  // Using boot button also as a custom button
+  pinMode(GPIO_NUM_0, INPUT);
 
 
   // Use SPI to configure the codec
@@ -179,43 +191,67 @@ void setup() {
   // std_cfg.clk_cfg.sample_rate_hz = 96000;
   // i2s_channel_reconfig_std_clock(tx_handle, &std_cfg.clk_cfg);
 }
-;
-void loop() {
-  static uint8_t rBuffer[bufferSize];
-  size_t resBytesIn = 0;
-  esp_err_t res = i2s_channel_read(rx_handle, &rBuffer, bufferSize, &resBytesIn, portMAX_DELAY);
-  if (res != ESP_OK) {
-    Serial.println("Error reading from I2S");
-    // return;
-  } else {
-    Serial.println("Success reading from I2S");
-  }
 
-  // int32_t samples_read = resBytesIn / 8; // TODO: the example code was 8; why 8?
-  static uint8_t wBuffer[bufferSize];
-  size_t sum = 0;
-  if (resBytesIn > 0) {
-    for (size_t i = 0; i < resBytesIn; ++i) {
-      wBuffer[i] = rBuffer[i];
-      sum += rBuffer[i];
-    }
-  }
+esp_err_t res;
+void loop() {
+  // static uint8_t rBuffer[bufferSize];
+  // size_t resBytesIn = 0;
+  // res = i2s_channel_read(rx_handle, &rBuffer, bufferSize, &resBytesIn, portMAX_DELAY);
+  // if (res != ESP_OK) {
+  //   Serial.println("Error reading from I2S");
+  //   // return;
+  // } else {
+  //   Serial.println("Success reading from I2S");
+  // }
+
+  // // int32_t samples_read = resBytesIn / 8; // TODO: the example code was 8; why 8?
+  // static uint8_t wBuffer[bufferSize];
+  // size_t sum = 0;
+  // if (resBytesIn > 0) {
+  //   for (size_t i = 0; i < resBytesIn; ++i) {
+  //     wBuffer[i] = rBuffer[i];
+  //     sum += rBuffer[i];
+  //   }
+  // }
 
   size_t resBytesOut = 0;
-  res = i2s_channel_write(tx_handle, &wBuffer, resBytesIn, &resBytesOut, portMAX_DELAY);
-
-  if (res != ESP_OK) {
-    Serial.println("Error writing to I2S");
-    // return;
+  // uint16_t buttonRead = analogRead(GPIO0);
+  // Serial.print("Button read: ");
+  // Serial.print(buttonRead);?
+  counter++;
+  // Serial.print("Counter: ");
+  // Serial.print(counter);
+  if (counter < 1'000) {
+    res = i2s_channel_write(tx_handle, &constBuffer1, bufferSize, &resBytesOut, portMAX_DELAY);
   } else {
-    Serial.print("Success writing. sum = ");
-    Serial.print(sum);
-    Serial.print("; bytes in = ");
-    Serial.print(resBytesIn);
-    Serial.print("; bytes out = ");
-    Serial.print(resBytesOut);
-    Serial.println();
+    res = i2s_channel_write(tx_handle, &constBuffer2, bufferSize, &resBytesOut, portMAX_DELAY);
+    if (counter == 2'000) {
+      counter = 0;
+    }
   }
+  // 1000'0000'1000'0000'1000'
+  // 0000'1000'0000'1000'0000'
+  // avg
+  // 0100'0100'0100'0100'0100'
+
+  // 0111'1111'0111'1111'0111'
+  // 1111'0111'1111'0111'1111'
+  // avg
+  // 1011'1011'1011'1011'1011'
+
+  // if (res != ESP_OK) {
+  //   Serial.println("Error writing to I2S");
+  //   // return;
+  // } else {
+  //   // Serial.print("Success writing. sum = ");
+  //   // Serial.print(sum);
+  //   // Serial.print("; bytes in = ");
+  //   // Serial.print(resBytesIn);
+  //   Serial.print("; bytes out = ");
+  //   Serial.print(resBytesOut);
+  //   Serial.println();
+  // }
+
 }
 
 // Goat example:
