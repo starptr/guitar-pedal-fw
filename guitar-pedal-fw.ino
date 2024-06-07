@@ -1,6 +1,7 @@
 #include <driver/i2s_std.h>
 #include <driver/gpio.h>
 #include <SPI.h>
+#include <cmath>
 
 // Unused GPIOs
 #define GPIO3 15
@@ -20,23 +21,34 @@
 
 #define GPIO0 27
 
-#define CODEC_DATA_OUT GPIO_NUM_9
-#define CODEC_BITCLK GPIO_NUM_10
-#define CODEC_LRCLK GPIO_NUM_11
-#define CODEC_SYSCLK GPIO_NUM_12
-#define CODEC_ML GPIO_NUM_13
-#define CODEC_RST GPIO_NUM_14
-#define CODEC_MC GPIO_NUM_15
-#define CODEC_MD GPIO_NUM_16
-#define CODEC_ZFLG GPIO_NUM_17
-#define CODEC_DATA_IN GPIO_NUM_18
+#define CODEC_DATA_OUT_NUM GPIO_NUM_9
+#define CODEC_BITCLK_NUM GPIO_NUM_10
+#define CODEC_LRCLK_NUM GPIO_NUM_11
+#define CODEC_SYSCLK_NUM GPIO_NUM_12
+#define CODEC_ML_NUM GPIO_NUM_13
+#define CODEC_RST_NUM GPIO_NUM_14
+#define CODEC_MC_NUM GPIO_NUM_15
+#define CODEC_MD_NUM GPIO_NUM_16
+#define CODEC_ZFLG_NUM GPIO_NUM_17
+#define CODEC_DATA_IN_NUM GPIO_NUM_18
+
+#define CODEC_DATA_OUT GPIO9
+#define CODEC_BITCLK GPIO10
+#define CODEC_LRCLK GPIO11
+#define CODEC_SYSCLK GPIO12
+#define CODEC_ML GPIO13
+#define CODEC_RST GPIO14
+#define CODEC_MC GPIO15
+#define CODEC_MD GPIO16
+#define CODEC_ZFLG GPIO17
+#define CODEC_DATA_IN GPIO18
 
 SPIClass* vspi = nullptr;
 
 i2s_chan_handle_t tx_handle;
 i2s_chan_handle_t rx_handle;
 
-static const size_t bufferSize = 544;
+static const size_t bufferSize = 30'000;
 uint8_t constBuffer1[bufferSize];
 uint8_t constBuffer2[bufferSize];
 uint32_t counter = 0;
@@ -44,12 +56,14 @@ uint32_t counter = 0;
 void setup() {
   // construct constBuffer
   for (size_t i = 0; i < bufferSize; i++) {
-    // if it's unsigned, this is uint8::max() to uint8::min()
-    // if it's signed, this is (int8)-1 to (int8)0
-    constBuffer1[i] = (i < bufferSize / 2) ? 0xff : 0x00;
-    // if it's unsigned, this is (uint8)127 to (uint8)128
-    // if it's signed, this is int8::max() to int8::min()
-    constBuffer2[i] = (i < bufferSize / 2) ? 0x7f : 0x80;
+    // // if it's unsigned, this is uint8::max() to uint8::min()
+    // // if it's signed, this is (int8)-1 to (int8)0
+    // constBuffer1[i] = (i / (bufferSize / 6) % 2) ? 0xff : 0x00;
+    // // if it's unsigned, this is (uint8)127 to (uint8)128
+    // // if it's signed, this is int8::max() to int8::min()
+    // constBuffer2[i] = (i < bufferSize / 2) ? 0x7f : 0x80;
+    constBuffer1[i] = (i % 109);
+    constBuffer2[i] = ((i / 55) % 2) ? 100 : 0;
   }
 
   Serial.begin(115200);
@@ -164,10 +178,10 @@ void setup() {
     .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG((i2s_data_bit_width_t) 20, I2S_SLOT_MODE_MONO),
     .gpio_cfg = {
       .mclk = I2S_GPIO_UNUSED, // Only appplicable for peripheral mode (but we are using the esp32 in controller mode)
-      .bclk = CODEC_BITCLK,
-      .ws = CODEC_LRCLK,
-      .dout = CODEC_DATA_IN,
-      .din = CODEC_DATA_OUT,
+      .bclk = CODEC_BITCLK_NUM,
+      .ws = CODEC_LRCLK_NUM,
+      .dout = CODEC_DATA_IN_NUM,
+      .din = CODEC_DATA_OUT_NUM,
       .invert_flags = { // NOTE: Idk what these do
         .mclk_inv = false,
         .bclk_inv = false,
@@ -201,7 +215,18 @@ void loop() {
   //   Serial.println("Error reading from I2S");
   //   // return;
   // } else {
-  //   Serial.println("Success reading from I2S");
+  //   Serial.printf("Success reading %ld bytes from I2S: ", resBytesIn);
+  //   // Serial.print("rBuffer[0:5]: ");
+  //   // Serial.print(rBuffer[0]);
+  //   // Serial.print(rBuffer[1]);
+  //   // Serial.print(rBuffer[2]);
+  //   // Serial.print(rBuffer[3]);
+  //   // Serial.print(rBuffer[4]);
+  //   // Serial.println("");
+  //   for (size_t i = 0; i < resBytesIn; i++) {
+  //     Serial.printf("%ld-", rBuffer[i]);
+  //   }
+  //   Serial.println();
   // }
 
   // // int32_t samples_read = resBytesIn / 8; // TODO: the example code was 8; why 8?
@@ -215,19 +240,19 @@ void loop() {
   // }
 
   size_t resBytesOut = 0;
-  // uint16_t buttonRead = analogRead(GPIO0);
+  uint16_t buttonRead = analogRead(GPIO0);
   // Serial.print("Button read: ");
-  // Serial.print(buttonRead);?
+  // Serial.print(buttonRead);
   counter++;
-  // Serial.print("Counter: ");
-  // Serial.print(counter);
-  if (counter < 1'000) {
-    res = i2s_channel_write(tx_handle, &constBuffer1, bufferSize, &resBytesOut, portMAX_DELAY);
+  Serial.print("Counter: ");
+  Serial.print(counter);
+  if (counter < 10) {
+   res = i2s_channel_write(tx_handle, &constBuffer1, bufferSize, &resBytesOut, portMAX_DELAY);
   } else {
-    res = i2s_channel_write(tx_handle, &constBuffer2, bufferSize, &resBytesOut, portMAX_DELAY);
-    if (counter == 2'000) {
-      counter = 0;
-    }
+   res = i2s_channel_write(tx_handle, &constBuffer2, bufferSize, &resBytesOut, portMAX_DELAY);
+   if (counter == 20) {
+     counter = 0;
+   }
   }
   // 1000'0000'1000'0000'1000'
   // 0000'1000'0000'1000'0000'
@@ -239,20 +264,22 @@ void loop() {
   // avg
   // 1011'1011'1011'1011'1011'
 
-  // if (res != ESP_OK) {
-  //   Serial.println("Error writing to I2S");
-  //   // return;
-  // } else {
-  //   // Serial.print("Success writing. sum = ");
-  //   // Serial.print(sum);
-  //   // Serial.print("; bytes in = ");
-  //   // Serial.print(resBytesIn);
-  //   Serial.print("; bytes out = ");
-  //   Serial.print(resBytesOut);
-  //   Serial.println();
-  // }
+  if (res != ESP_OK) {
+    Serial.println("Error writing to I2S");
+    // return;
+  } else {
+    // Serial.print("Success writing. sum = ");
+    // Serial.print(sum);
+    // Serial.print("; bytes in = ");
+    // Serial.print(resBytesIn);
+    Serial.print("; bytes out = ");
+    Serial.print(resBytesOut);
+    Serial.println();
+  }
+  vTaskDelay(pdMS_TO_TICKS(1000));
 
 }
 
 // Goat example:
 // https://dronebotworkshop.com/esp32-i2s/
+
